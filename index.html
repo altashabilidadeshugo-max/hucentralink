@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel da Equipe - Estágios</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --primary: #3b82f6; 
+            --primary-hover: #2563eb;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            margin: 0; padding: 0; font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color); color: var(--text-main); min-height: 100vh;
+        }
+
+        .topbar {
+            background-color: var(--card-bg); padding: 20px 40px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 10;
+        }
+
+        .brand h1 { margin: 0; font-size: 1.5rem; color: var(--text-main); }
+        .brand p { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+        #clock { font-weight: 600; color: var(--primary); }
+
+        .search-box { position: relative; width: 400px; }
+        .search-box i { position: absolute; left: 15px; top: 12px; color: var(--text-muted); }
+        .search-box input {
+            width: 100%; padding: 10px 10px 10px 40px; border: 1px solid var(--border);
+            border-radius: 20px; font-size: 1rem; outline: none; box-sizing: border-box;
+            background-color: var(--bg-color); transition: 0.2s;
+        }
+        .search-box input:focus { border-color: var(--primary); background-color: white; }
+
+        .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
+
+        .category-title {
+            font-size: 1.2rem; color: var(--text-muted); border-bottom: 2px solid var(--border);
+            padding-bottom: 10px; margin-bottom: 20px; margin-top: 40px;
+        }
+
+        .links-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;
+        }
+
+        .link-card {
+            background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
+            padding: 20px; text-decoration: none; color: var(--text-main); display: flex;
+            align-items: center; gap: 15px; transition: transform 0.2s, box-shadow 0.2s; position: relative;
+        }
+
+        .link-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: var(--primary); }
+
+        .link-icon {
+            font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+            font-size: 2rem; width: 50px; height: 50px; display: flex; align-items: center;
+            justify-content: center; background-color: #eff6ff; border-radius: 12px; flex-shrink: 0;
+        }
+
+        .link-info h3 { margin: 0 0 5px 0; font-size: 1.1rem; }
+        .link-info p { margin: 0; font-size: 0.85rem; color: var(--text-muted); word-break: break-all;}
+
+        /* Botão de Copiar */
+        .card-actions {
+            position: absolute; top: 10px; right: 10px; opacity: 0; transition: 0.2s;
+        }
+        .link-card:hover .card-actions { opacity: 1; }
+
+        .btn-action {
+            background: var(--bg-color); border: 1px solid var(--border); color: var(--text-muted);
+            width: 32px; height: 32px; border-radius: 50%; display: flex; justify-content: center;
+            align-items: center; cursor: pointer; transition: 0.2s;
+        }
+        .btn-action:hover { transform: scale(1.1); color: var(--primary); border-color: var(--primary); }
+
+        .no-results { text-align: center; color: var(--text-muted); padding: 40px; font-size: 1.1rem; grid-column: 1 / -1; }
+
+        /* Notificação (Toast) */
+        #toast {
+            position: fixed; bottom: -50px; left: 50%; transform: translateX(-50%); background: #10b981;
+            color: white; padding: 10px 20px; border-radius: 20px; font-size: 0.9rem; font-weight: 500;
+            transition: 0.3s; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        #toast.show { bottom: 30px; }
+
+        @media (max-width: 768px) {
+            .topbar { flex-direction: column; gap: 15px; padding: 20px; text-align: center; }
+            .search-box { width: 100%; }
+            .card-actions { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="topbar">
+        <div class="brand">
+            <h1>Portal de Links - Equipe Estágios</h1>
+            <p id="clock">Carregando hora...</p>
+        </div>
+        
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="search-input" placeholder="Buscar sistema ou link..." oninput="renderLinks()">
+        </div>
+    </div>
+
+    <div class="container" id="dashboard-content"></div>
+
+    <div id="toast"><i class="fas fa-check-circle"></i> Link copiado!</div>
+
+    <script>
+        // === Relógio ===
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = 
+                now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }) + 
+                ' • ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        }
+        setInterval(updateClock, 1000); updateClock();
+
+        // =========================================================
+        // 🔴 ÁREA DE EDIÇÃO DOS LINKS (FIXOS NO CÓDIGO) 🔴
+        // =========================================================
+        const links = [
+            // CATEGORIA: CONVÊNIOS BASE
+            {
+                title: "CONVÊNIO (ENFERMAGEM)",
+                url: "https://kroton-my.sharepoint.com/personal/gabriel_f_nascimento_kroton_com_br/Lists/Conv_Estagio/AllItems.aspx?FilterFields1=Curso&FilterValues1=AREA%20DA%20SA%C3%9ADE%3B%23TODOS%3B%23ENFERMAGEM&FilterTypes1=Choice&viewid=2e0334d1%2D21b8%2D42af%2Db0f8%2Da705fb39c9cb&env=WebViewList&OR=Teams%2DHL&CT=1696004779947&clickparams=eyJBcHBOYW1lIjoiVGVhbXMtRGVza3RvcCIsIkFwcFZlcnNpb24iOiIyNy8yMzA5MDExMjIyOSIsIkhhc0ZlZGVyYXRlZFVzZXIiOmZhbHNlfQ%3D%3D",
+                category: "CONVÊNIOS BASE",
+                emoji: "🎓",
+                desc: "CONVÊNIOS DOS CURSOS DA SAÚDE"
+            },
+            {
+                title: "CONVÊNIO (FARMÁCIA)",
+                url: "https://kroton-my.sharepoint.com/personal/gabriel_f_nascimento_kroton_com_br/Lists/Conv_Estagio/AllItems.aspx?FilterFields1=Curso&FilterValues1=AREA%20DA%20SA%C3%9ADE%3B%23FARM%C3%81CIA%3B%23TODOS&FilterTypes1=Choice&viewid=2e0334d1-21b8-42af-b0f8-a705fb39c9cb&env=WebViewList&OR=Teams-HL&CT=1696004779947&clickparams=eyJBcHBOYW1lIjoiVGVhbXMtRGVza3RvcCIsIkFwcFZlcnNpb24iOiIyNy8yMzA5MDExMjIyOSIsIkhhc0ZlZGVyYXRlZFVzZXIiOmZhbHNlfQ%3D%3D",
+                category: "CONVÊNIOS BASE",
+                emoji: "🎓",
+                desc: "CONVÊNIOS DOS CURSOS DA SAÚDE"
+            },
+            {
+                title: "CONVÊNIO (BIOMEDICINA)",
+                url: "https://kroton-my.sharepoint.com/personal/gabriel_f_nascimento_kroton_com_br/Lists/Conv_Estagio/AllItems.aspx?FilterFields1=Curso&FilterValues1=AREA%20DA%20SA%C3%9ADE%3B%23TODOS%3B%23BIOMEDICINA&FilterTypes1=Choice&viewid=2e0334d1%2D21b8%2D42af%2Db0f8%2Da705fb39c9cb&env=WebViewList&OR=Teams%2DHL&CT=1696004779947&clickparams=eyJBcHBOYW1lIjoiVGVhbXMtRGVza3RvcCIsIkFwcFZlcnNpb24iOiIyNy8yMzA5MDExMjIyOSIsIkhhc0ZlZGVyYXRlZFVzZXIiOmZhbHNlfQ%3D%3D",
+                category: "CONVÊNIOS BASE",
+                emoji: "🎓",
+                desc: "CONVÊNIOS DOS CURSOS DA SAÚDE"
+            },
+            {
+                title: "CONVÊNIO (RADIOLOGIA)",
+                url: "https://kroton-my.sharepoint.com/personal/gabriel_f_nascimento_kroton_com_br/Lists/Conv_Estagio/AllItems.aspx?FilterFields1=Curso&FilterValues1=AREA%20DA%20SA%C3%9ADE%3B%23TODOS%3B%23RADIOLOGIA&FilterTypes1=Choice&viewid=2e0334d1%2D21b8%2D42af%2Db0f8%2Da705fb39c9cb&env=WebViewList&OR=Teams%2DHL&CT=1696004779947&clickparams=eyJBcHBOYW1lIjoiVGVhbXMtRGVza3RvcCIsIkFwcFZlcnNpb24iOiIyNy8yMzA5MDExMjIyOSIsIkhhc0ZlZGVyYXRlZFVzZXIiOmZhbHNlfQ%3D%3D",
+                category: "CONVÊNIOS BASE",
+                emoji: "🎓",
+                desc: "CONVÊNIOS DOS CURSOS DA SAÚDE"
+            },
+            {
+                title: "CONVÊNIO (NUTRIÇÃO)",
+                url: "https://kroton-my.sharepoint.com/personal/gabriel_f_nascimento_kroton_com_br/Lists/Conv_Estagio/AllItems.aspx?FilterFields1=Curso&FilterValues1=AREA%20DA%20SA%C3%9ADE%3B%23TODOS%3B%23NUTRI%C3%87%C3%83O&FilterTypes1=Choice&viewid=2e0334d1%2D21b8%2D42af%2Db0f8%2Da705fb39c9cb&env=WebViewList&OR=Teams%2DHL&CT=1696004779947&clickparams=eyJBcHBOYW1lIjoiVGVhbXMtRGVza3RvcCIsIkFwcFZlcnNpb24iOiIyNy8yMzA5MDExMjIyOSIsIkhhc0ZlZGVyYXRlZFVzZXIiOmZhbHNlfQ%3D%3D",
+                category: "CONVÊNIOS BASE",
+                emoji: "🎓",
+                desc: "CONVÊNIOS DOS CURSOS DA SAÚDE"
+            },
+            {
+                title: "CONVÊNIO (FISIOTERAPIA)",
+                url: "https://kroton-my.sharepoint.com/personal/gabriel_f_nascimento_kroton_com_br/Lists/Conv_Estagio/AllItems.aspx?FilterFields1=Curso&FilterValues1=AREA%20DA%20SA%C3%9ADE%3B%23TODOS%3B%23FISIOTERAPIA&FilterTypes1=Choice&viewid=2e0334d1%2D21b8%2D42af%2Db0f8%2Da705fb39c9cb&env=WebViewList&OR=Teams%2DHL&CT=1696004779947&clickparams=eyJBcHBOYW1lIjoiVGVhbXMtRGVza3RvcCIsIkFwcFZlcnNpb24iOiIyNy8yMzA5MDExMjIyOSIsIkhhc0ZlZGVyYXRlZFVzZXIiOmZhbHNlfQ%3D%3D",
+                category: "CONVÊNIOS BASE",
+                emoji: "🎓",
+                desc: "CONVÊNIOS DOS CURSOS DA SAÚDE"
+            },
+
+            // OUTROS SISTEMAS E PLANILHAS
+            {
+                title: "CONVOCAÇÃO",
+                url: "https://kroton.sharepoint.com/sites/DOA_ESTAGIO_OBRIGATORIO/Documentos%20Partilhados/Forms/AllItems.aspx?id=%2Fsites%2FDOA%5FESTAGIO%5FOBRIGATORIO%2FDocumentos%20Partilhados%2FOBRIGAT%C3%93RIO%2FPRECEPTORES%20%2D%20BASE&p=true&ga=1",
+                category: "PRECEPTOR / SUPERVISOR ",
+                emoji: "🎓",
+                desc: "Base de convocação"
+            },
+            {
+                title: "TELA DE CADASTRO DO ALUNO COLABORAR",
+                url: "https://estagio.colaboraread.com.br/liberacaoTermo/index",
+                category: "Sistemas Principais/ COLABORAR",
+                emoji: "🏛️",
+                desc: "Acesso para análise de cadastro no colaborar"
+            },
+            {
+                title: "TELA DE CADASTRO DE ATIVIDADES COLABORAR",
+                url: "https://estagio.colaboraread.com.br/atividadeEstagio/create",
+                category: "Sistemas Principais/ COLABORAR",
+                emoji: "🏛️",
+                desc: "Acesso para análise de cadastro de atividades no colaborar"
+            },
+            {
+                title: "INSERIR DECLARAÇÃO DE DISPENSA REMUNERADO / COLABORAR",
+                url: "https://estagio.colaboraread.com.br/dispensaEstagioRemunerado/form",
+                category: "Sistemas Principais/ COLABORAR",
+                emoji: "📊",
+                desc: "inserir a declaração de dispensa enviada via chamado"
+            },
+            {
+                title: "ANALISAR DECLARAÇÃO DE DISPENSA / SISTEMA / COLABORAR",
+                url: "https://estagio.colaboraread.com.br/dispensaEstagioRemunerado/index",
+                category: "Sistemas Principais/ COLABORAR",
+                emoji: "📊",
+                desc: "ANALISAR a declaração de dispensa enviada pelo polo"
+            },
+            {
+                title: "CADASTRO DE SUPERVISOR / SISTEMA / COLABORAR",
+                url: "https://estagio.colaboraread.com.br/liberacaoSupervisor/index",
+                category: "Sistemas Principais/ COLABORAR",
+                emoji: "📊",
+                desc: "Analisar o cadastro do supervisor"
+            },
+            {
+                title: "CONSULTAR MÁXIMO DE ALUNOS POR SUPERVISOR",
+                url: "https://estagio.colaboraread.com.br/maximosAlunos/index",
+                category: "Sistemas Principais/ COLABORAR",
+                emoji: "📊",
+                desc: "Cunsultar o limite de alunos por supervisor"
+            },
+            {
+                title: "DATA LIMITE PARA ENTREGA DE DOCUMENTOS DE ESTÁGIO",
+                url: "https://estagio.colaboraread.com.br/dataLimiteDocumentacao/index",
+                category: "Sistemas Principais/ COLABORAR",
+                emoji: "📊",
+                desc: "Consultar data limite"
+            },
+            {
+                title: "RELATÓRIOS DE ALUNOS POR SUPERVISOR",
+                url: "https://extranet.colaboraread.com.br/reports/view?codigo=ESTAGIO_CURRICULAR2",
+                category: "Sistemas Principais/ COLABORAR",
+                emoji: "📊",
+                desc: "Consultar base de alunos vinculados no supervisor"
+            },
+            {
+                title: "ALUNOS PERDIDOS",
+                url: "https://extranet.colaboraread.com.br/reports/view?codigo=LANCAMENTOS_ALUNOS_CANCEL",
+                category: "Sistemas Principais/ COLABORAR",
+                emoji: "📊",
+                desc: "Consultar notas perdidas"
+            },
+            {
+                title: "LISTAGEM DE ESTÁGIO REMUNERADO DO ALUNO",
+                url: "https://estagio.colaboraread.com.br/remunerado/index",
+                category: "Sistemas Principais/ COLABORAR",
+                emoji: "📊",
+                desc: "Verificar se o aluno tem estágio remunerado"
+            },
+
+            // CATEGORIA: FERRAMENTAS ÚTEIS
+            {
+                title: "CALCULADORA DE VIGÊNCIA/ PTC / COLABORAR",
+                url: "https://verificacaodatasptc.netlify.app",
+                category: "FERRAMENTAS",
+                emoji: "⏱️",
+                desc: "Calcula dias úteis do aluno e do supervisor"
+            },
+            {
+                title: "Leitor de PDF",
+                url: "https://lerlivrosto.netlify.app/",
+                category: "FERRAMENTAS",
+                emoji: "📚",
+                desc: "Leitor e rotacionador de PDF"
+            },
+            {
+                title: "CONSULTAR CNPJ / SITE DA RECEITA FEDERAL",
+                url: "https://www.situacaocadastral.info/",
+                category: "FERRAMENTAS",
+                emoji: "📚",
+                desc: "Site da receita federal"
+            },
+
+            // CATEGORIA: RESPOSTAS E ATIVIDADES
+            {
+                title: "MODELO DE RESPOSTA DA ANÁLISE DO CADASTRO DO ALUNO /TCE",
+                url: "https://kroton.sharepoint.com/:w:/r/sites/DOA_ESTAGIO_OBRIGATORIO/_layouts/15/Doc.aspx?sourcedoc=%7B6428D944-647D-4281-9B1E-D80AC9B76E15%7D&file=Modelo%20Respostas%20-%20Libera%C3%A7%C3%A3o.docx&action=default&mobileredirect=true",
+                category: "RESPOSTAS DE SISTEMA",
+                emoji: "✉️",
+                desc: "Documento com modelos de respostas para o cadastro do aluno no TCE"
+            },
+            {
+                title: "BASE DE ATIVIDADES 2026.2",
+                url: "https://kroton.sharepoint.com/:x:/r/sites/DOA_ESTAGIO_OBRIGATORIO/_layouts/15/Doc.aspx?sourcedoc=%7BE843CC21-0738-45BF-956D-B7980828DC21%7D&file=ATIVIDADES%202026_2.xlsx&action=default&mobileredirect=true",
+                category: "ATIVIDADES DE ESTÁGIO",
+                emoji: "📁",
+                desc: "Base de atividades do semestre"
+            }
+        ];
+        // =========================================================
+
+        // === Função para Copiar Link ===
+        function copyToClipboard(url, event) {
+            event.preventDefault(); // Impede de abrir a página ao clicar no botão de copiar
+            navigator.clipboard.writeText(url).then(() => {
+                const toast = document.getElementById('toast');
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 2500);
+            });
+        }
+
+        // === Renderização ===
+        function renderLinks() {
+            const container = document.getElementById('dashboard-content');
+            const searchText = document.getElementById('search-input').value.toLowerCase();
+            container.innerHTML = '';
+
+            // Filtra os links pela busca
+            const filteredLinks = links.filter(link => 
+                link.title.toLowerCase().includes(searchText) || link.category.toLowerCase().includes(searchText)
+            );
+
+            if (filteredLinks.length === 0) {
+                container.innerHTML = '<div class="no-results">Nenhum link encontrado.</div>'; return;
+            }
+
+            // Agrupa por categoria
+            const categories = {};
+            filteredLinks.forEach(link => {
+                if (!categories[link.category]) categories[link.category] = [];
+                categories[link.category].push(link);
+            });
+
+            // Cria o HTML na tela
+            Object.keys(categories).sort().forEach(catName => {
+                const section = document.createElement('div');
+                section.innerHTML = `<h2 class="category-title">${catName}</h2>`;
+                
+                const grid = document.createElement('div');
+                grid.className = 'links-grid';
+
+                categories[catName].forEach(link => {
+                    grid.innerHTML += `
+                        <a href="${link.url}" target="_blank" class="link-card">
+                            <div class="link-icon">${link.emoji}</div>
+                            <div class="link-info">
+                                <h3>${link.title}</h3>
+                                <p>${link.desc}</p>
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn-action copy" onclick="copyToClipboard('${link.url}', event)" title="Copiar Link">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </a>
+                    `;
+                });
+
+                section.appendChild(grid); 
+                container.appendChild(section);
+            });
+        }
+
+        // Carrega os links assim que a página abre
+        renderLinks();
+    </script>
+</body>
+</html>
